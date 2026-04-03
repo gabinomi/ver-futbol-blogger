@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --dark-900: #060d1a;
+    --dark-800: #081024;
+    --brand-red: #dc2626;
+    --brand-blue: #2563eb;
+  }
+}
+
+.bg-stadium {
+  position: fixed;
+  inset: 0;
+  will-change: transform;
+  transform: translateZ(0);
+  background:
+    linear-gradient(
+      rgb(6,13,26) 0%,
+      rgb(6,13,26) 8%,
+      rgba(6,13,26,0.45) 35%,
+      rgba(6,13,26,0.45) 65%,
+      rgb(6,13,26) 92%,
+      rgb(6,13,26) 100%
+    ),
+    url('https://nextjs.fanatiz.com/fanatiz/strapi/production/estadio_OTT_9bf35dcea2.jpg')
+    center center / cover no-repeat;
+  z-index: 0;
+}
+
+body > *:not(.bg-stadium) {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes pulseRed {
+  0%,100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.5); }
+  50%      { box-shadow: 0 0 0 9px rgba(220,38,38,0); }
+}
+@keyframes pulseBlue {
+  0%,100% { box-shadow: 0 6px 22px rgba(37,99,235,0.45); }
+  50%      { box-shadow: 0 8px 30px rgba(37,99,235,0.65); }
+}
+@keyframes blink {
+  0%,100% { opacity: 1; }
+  50%     { opacity: 0.2; }
+}
+@keyframes shine {
+  0%   { left: -120%; }
+  25%  { left: 130%; }
+  100% { left: 130%; }
+}
+@keyframes borderPulseRed {
+  0%,100% { box-shadow: 0 0 0 1px rgba(220,38,38,0.3), 0 0 10px rgba(220,38,38,0.15); }
+  50%     { box-shadow: 0 0 0 2px rgba(220,38,38,0.6), 0 0 22px rgba(220,38,38,0.35); }
+}
+
+.animate-pulse-red   { animation: pulseRed 1.8s ease-in-out infinite; }
+.animate-pulse-blue  { animation: pulseBlue 2.5s ease-in-out infinite; }
+.animate-blink       { animation: blink 1s infinite; }
+.animate-shine::after {
+  content: '';
+  position: absolute;
+  top: -60%; left: -120%;
+  width: 55%; height: 220%;
+  background: rgba(255,255,255,0.14);
+  transform: rotate(25deg);
+  animation: shine 3.5s ease-in-out infinite;
+}
+.card-en-vivo {
+  border-color: #dc2626;
+  animation: borderPulseRed 2s ease-in-out infinite;
+}

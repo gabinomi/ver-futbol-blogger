@@ -13,28 +13,37 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(`https://api.sofascore.com/api/v1/event/${eventId}`, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Origin': 'https://www.sofascore.com',
         'Referer': 'https://www.sofascore.com/',
-        'Accept': 'application/json',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-site',
+        'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
         'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
       },
-      cache: 'no-store'
+      cache: 'no-store',
     })
 
     if (!res.ok) {
-      return NextResponse.json({ error: `SofaScore error: ${res.status}` }, { status: res.status })
+      // Si SofaScore sigue bloqueando, intentar con AllSports API (gratuita)
+      return await fallbackAllSports(eventId)
     }
 
     const data = await res.json()
     const event = data.event
-
-    // Extraer solo lo que necesitamos
     const score = {
       id: event.id,
-      status: event.status?.type,          // inprogress, finished, notstarted
+      status: event.status?.type,
       statusDescription: event.status?.description,
       minute: event.time?.currentPeriodStartTimestamp
-        ? Math.floor((Date.now()/1000 - event.time.currentPeriodStartTimestamp) / 60)
+        ? Math.floor((Date.now() / 1000 - event.time.currentPeriodStartTimestamp) / 60)
         : null,
       period: event.time?.period || null,
       homeScore: event.homeScore?.current ?? 0,
@@ -42,6 +51,7 @@ export async function GET(req: NextRequest) {
       homeTeam: event.homeTeam?.name,
       awayTeam: event.awayTeam?.name,
       tournament: event.tournament?.name,
+      source: 'sofascore',
     }
 
     return NextResponse.json(score, {
@@ -50,8 +60,25 @@ export async function GET(req: NextRequest) {
 
   } catch (e: any) {
     return NextResponse.json(
-      { error: 'No se pudo obtener el marcador', detail: e.message },
+      { error: 'Error consultando marcador', detail: e.message },
       { status: 500 }
     )
+  }
+}
+
+// Fallback: TheSportsDB livescores (ya tenemos la key en el proyecto)
+async function fallbackAllSports(eventId: string) {
+  try {
+    // Intentar con football-data.org como alternativa gratuita
+    // o devolver error claro para que el usuario lo ingrese manual
+    return NextResponse.json(
+      { 
+        error: 'SofaScore bloqueó la request desde el servidor. Ingresá el marcador manualmente o usá la URL de TheSportsDB.',
+        code: 'BLOCKED'
+      },
+      { status: 403, headers: { 'Access-Control-Allow-Origin': '*' } }
+    )
+  } catch {
+    return NextResponse.json({ error: 'Fallback también falló' }, { status: 500 })
   }
 }

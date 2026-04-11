@@ -9,29 +9,34 @@ async function getToken(req: NextRequest): Promise<string | null> {
 function buildPostContent(data: any): string {
   const {
     equipoLocal, equipoVisitante, golLocal, golVisitante,
-    estado, imgVideo, linkVideo, link1, link2, link3,
-    canales, horaUtc, escudoLocal, escudoVisitante
+    estado, imgVideo, link1, link2, link3,
+    canales, horaUtc, escudoLocal, escudoVisitante, sofascoreId
   } = data
 
   return `<div class="match-data"
-  data-equipo-local="${equipoLocal}"
-  data-equipo-visitante="${equipoVisitante}"
-  data-gol-local="${golLocal || 0}"
-  data-gol-visitante="${golVisitante || 0}"
+  data-equipo-local="${equipoLocal || ''}"
+  data-equipo-visitante="${equipoVisitante || ''}"
+  data-gol-local="${golLocal ?? 0}"
+  data-gol-visitante="${golVisitante ?? 0}"
   data-img-video="${imgVideo || 'https://i.imgur.com/1CeQ09b.png'}"
-  data-link-video="${linkVideo || ''}"
+  data-link-video="${link1 || ''}"
   data-link1="${link1 || ''}"
   data-link2="${link2 || ''}"
   data-link3="${link3 || ''}"
   data-canales="${canales || ''}"
   data-estado="${estado || 'PRONTO'}"
   data-hora-utc="${horaUtc || ''}"
+  ${sofascoreId ? `data-sofascore-id="${sofascoreId}"` : ''}
   ${escudoLocal ? `data-escudo-local="${escudoLocal}"` : ''}
   ${escudoVisitante ? `data-escudo-visitante="${escudoVisitante}"` : ''}
 ></div>`
 }
 
-// GET — listar posts existentes
+function extractFromContent(content: string, attr: string): string {
+  const match = content.match(new RegExp(`data-${attr}="([^"]*)"`, 'i'))
+  return match ? match[1] : ''
+}
+
 export async function GET(req: NextRequest) {
   const token = await getToken(req)
   if (!token) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
@@ -44,7 +49,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(data)
 }
 
-// POST — crear nuevo post
 export async function POST(req: NextRequest) {
   const token = await getToken(req)
   if (!token) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
@@ -53,7 +57,7 @@ export async function POST(req: NextRequest) {
   const { titulo, liga, isDraft, ...postData } = body
 
   const fullTitle = liga ? `${liga}: ${titulo}` : titulo
-  const content = buildPostContent({ ...postData, equipoLocal: postData.equipoLocal, equipoVisitante: postData.equipoVisitante })
+  const content = buildPostContent(postData)
 
   const post = {
     kind: 'blogger#post',
@@ -73,14 +77,55 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(data, { status: res.ok ? 200 : 400 })
 }
 
-// PATCH — editar post existente
 export async function PATCH(req: NextRequest) {
   const token = await getToken(req)
   if (!token) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { postId, titulo, liga, isDraft, ...postData } = body
+  const { postId, updateScoreOnly, golLocal, golVisitante, estado } = body
 
+  if (updateScoreOnly) {
+    // Primero obtenemos el post actual para extraer sus datos
+    const getRes = await fetch(
+      `https://www.googleapis.com/blogger/v3/blogs/${BLOG_ID}/posts/${postId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    const current = await getRes.json()
+    if (current.error) return NextResponse.json({ error: current.error }, { status: 400 })
+
+    // Extraer datos existentes del content y parchear solo marcador y estado
+    const c = current.content || ''
+    const newContent = buildPostContent({
+      equipoLocal: extractFromContent(c, 'equipo-local'),
+      equipoVisitante: extractFromContent(c, 'equipo-visitante'),
+      golLocal,
+      golVisitante,
+      estado,
+      imgVideo: extractFromContent(c, 'img-video'),
+      link1: extractFromContent(c, 'link1'),
+      link2: extractFromContent(c, 'link2'),
+      link3: extractFromContent(c, 'link3'),
+      canales: extractFromContent(c, 'canales'),
+      horaUtc: extractFromContent(c, 'hora-utc'),
+      sofascoreId: extractFromContent(c, 'sofascore-id'),
+      escudoLocal: extractFromContent(c, 'escudo-local'),
+      escudoVisitante: extractFromContent(c, 'escudo-visitante'),
+    })
+
+    const res = await fetch(
+      `https://www.googleapis.com/blogger/v3/blogs/${BLOG_ID}/posts/${postId}`,
+      {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: newContent }),
+      }
+    )
+    const data = await res.json()
+    return NextResponse.json(data, { status: res.ok ? 200 : 400 })
+  }
+
+  // Edición completa
+  const { titulo, liga, isDraft, ...postData } = body
   const fullTitle = liga ? `${liga}: ${titulo}` : titulo
   const content = buildPostContent(postData)
 
@@ -96,7 +141,6 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json(data, { status: res.ok ? 200 : 400 })
 }
 
-// DELETE — eliminar post
 export async function DELETE(req: NextRequest) {
   const token = await getToken(req)
   if (!token) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })

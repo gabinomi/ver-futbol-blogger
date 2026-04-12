@@ -74,6 +74,33 @@ export async function POST(req: NextRequest) {
     body: JSON.stringify(post),
   })
   const data = await res.json()
+
+  // Si tiene sofascoreId, registrarlo en Supabase para tracking automático
+  if (res.ok && body.sofascoreId) {
+    try {
+      const { createClient } = await import('@supabase/supabase-js')
+      const sb = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      await sb.from('marcadores').upsert({
+        sofascore_id: body.sofascoreId,
+        equipo_local: body.equipoLocal || '',
+        equipo_visitante: body.equipoVisitante || '',
+        liga: body.liga || '',
+        apifootball_id: body.apifootballId || null,
+        sportmonks_id: body.sportmonksId || null,
+        gol_local: parseInt(body.golLocal) || 0,
+        gol_visitante: parseInt(body.golVisitante) || 0,
+        estado: body.estado || 'PRONTO',
+        activo: body.estado !== 'FINALIZADO',
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'sofascore_id' })
+    } catch (e) {
+      console.error('Supabase register error:', e)
+    }
+  }
+
   return NextResponse.json(data, { status: res.ok ? 200 : 400 })
 }
 

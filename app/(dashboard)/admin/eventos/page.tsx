@@ -326,25 +326,48 @@ export default function EventosPage() {
                     </div>
                   </div>
 
-                  {/* MARCADOR + SOFASCORE */}
-                  <div className="bg-gray-800 rounded-lg p-3 space-y-2">
-                    <div className="text-xs font-bold uppercase text-gray-400">Marcador</div>
+                  {/* MARCADOR */}
+                  <div className="bg-gray-800 rounded-lg p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase text-gray-400">Marcador <span className="text-gray-600 normal-case font-normal">(opcional)</span></span>
+                    </div>
+
                     <div className="grid grid-cols-3 gap-2 items-center">
                       <div><label className={lbl}>Goles Local</label><input className={inp} type="number" min="0" value={form.golLocal} onChange={e => upd('golLocal', e.target.value)} /></div>
                       <div className="text-center text-gray-500 text-xl font-black mt-4">-</div>
                       <div><label className={lbl}>Goles Visit.</label><input className={inp} type="number" min="0" value={form.golVisitante} onChange={e => upd('golVisitante', e.target.value)} /></div>
                     </div>
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <label className={lbl}>SofaScore ID <span className="text-gray-600 normal-case">(número en la URL)</span></label>
-                        <input className={inp} value={form.sofascoreId} onChange={e => upd('sofascoreId', e.target.value)} placeholder="ej: 15239012" />
+
+                    <div className="border-t border-gray-700 pt-3">
+                      <p className="text-xs text-gray-500 mb-2">
+                        IDs para actualización automática — todos opcionales. Pegá la URL y copiá solo el número.
+                      </p>
+
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <label className={lbl}>SofaScore ID</label>
+                          <input className={inp} value={form.sofascoreId} onChange={e => upd('sofascoreId', e.target.value)}
+                            placeholder="ej: 15239012  (sofascore.com/...#id:15239012)" />
+                        </div>
+                        <button onClick={fetchScore} disabled={!form.sofascoreId || fetchingScore}
+                          className="mt-5 px-3 py-2 bg-green-700 hover:bg-green-600 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg text-xs font-bold whitespace-nowrap">
+                          {fetchingScore ? '...' : '⚡ Test'}
+                        </button>
                       </div>
-                      <button onClick={fetchScore} disabled={!form.sofascoreId || fetchingScore}
-                        className="mt-5 px-3 py-2 bg-green-700 hover:bg-green-600 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg text-xs font-bold whitespace-nowrap">
-                        {fetchingScore ? '...' : '⚡ Obtener'}
-                      </button>
+
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <div>
+                          <label className={lbl}>API-Football ID <span className="text-gray-600 normal-case font-normal">opcional</span></label>
+                          <input className={inp} value={form.apifootballId || ''} onChange={e => upd('apifootballId', e.target.value)}
+                            placeholder="ej: 867421" />
+                        </div>
+                        <div>
+                          <label className={lbl}>SportMonks ID <span className="text-gray-600 normal-case font-normal">opcional</span></label>
+                          <input className={inp} value={form.sportmonksId || ''} onChange={e => upd('sportmonksId', e.target.value)}
+                            placeholder="ej: 19234567" />
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-600">Pegá la URL de SofaScore del partido y extraé solo el número final: sofascore.com/.../id:<b>15239012</b></p>
                   </div>
 
                   <div><label className={lbl}>Imagen del partido</label>

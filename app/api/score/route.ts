@@ -1,84 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const eventId = searchParams.get('id')
+  const id = searchParams.get('id')
 
-  if (!eventId) {
-    return NextResponse.json({ error: 'Falta el parámetro id' }, { status: 400 })
-  }
+  if (!id) return NextResponse.json({ error: 'Falta id' }, { status: 400 })
 
-  try {
-    const res = await fetch(`https://api.sofascore.com/api/v1/event/${eventId}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Origin': 'https://www.sofascore.com',
-        'Referer': 'https://www.sofascore.com/',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'same-site',
-        'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-        'Sec-Ch-Ua-Mobile': '?0',
-        'Sec-Ch-Ua-Platform': '"Windows"',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-      },
-      cache: 'no-store',
-    })
+  const { data, error } = await supabase
+    .from('marcadores')
+    .select('*')
+    .eq('sofascore_id', id)
+    .single()
 
-    if (!res.ok) {
-      // Si SofaScore sigue bloqueando, intentar con AllSports API (gratuita)
-      return await fallbackAllSports(eventId)
-    }
-
-    const data = await res.json()
-    const event = data.event
-    const score = {
-      id: event.id,
-      status: event.status?.type,
-      statusDescription: event.status?.description,
-      minute: event.time?.currentPeriodStartTimestamp
-        ? Math.floor((Date.now() / 1000 - event.time.currentPeriodStartTimestamp) / 60)
-        : null,
-      period: event.time?.period || null,
-      homeScore: event.homeScore?.current ?? 0,
-      awayScore: event.awayScore?.current ?? 0,
-      homeTeam: event.homeTeam?.name,
-      awayTeam: event.awayTeam?.name,
-      tournament: event.tournament?.name,
-      source: 'sofascore',
-    }
-
-    return NextResponse.json(score, {
-      headers: { 'Access-Control-Allow-Origin': '*' }
-    })
-
-  } catch (e: any) {
+  if (error || !data) {
     return NextResponse.json(
-      { error: 'Error consultando marcador', detail: e.message },
-      { status: 500 }
+      { error: 'Partido no encontrado en cache', code: 'NOT_IN_CACHE' },
+      { status: 404, headers: { 'Access-Control-Allow-Origin': '*' } }
     )
   }
+
+  return NextResponse.json(data, {
+    headers: { 'Access-Control-Allow-Origin': '*' }
+  })
 }
 
-// Fallback: TheSportsDB livescores (ya tenemos la key en el proyecto)
-async function fallbackAllSports(eventId: string) {
-  try {
-    // Intentar con football-data.org como alternativa gratuita
-    // o devolver error claro para que el usuario lo ingrese manual
-    return NextResponse.json(
-      { 
-        error: 'SofaScore bloqueó la request desde el servidor. Ingresá el marcador manualmente o usá la URL de TheSportsDB.',
-        code: 'BLOCKED'
-      },
-      { status: 403, headers: { 'Access-Control-Allow-Origin': '*' } }
-    )
-  } catch {
-    return NextResponse.json({ error: 'Fallback también falló' }, { status: 500 })
-  }
+// POST — registrar un partido para ser trackeado
+export async function POST(req: NextRequest) {
+  const body = await req.json()
+  const { sofascore_id, equipo_local, equipo_visitante, liga, apifootball_id, sportmonks_id } = body
+
+  if (!sofascore_id) return NextResponse.json({ error: 'Falta sofascore_id' }, { status: 400 })
+
+  const { error } = await supabase.from('marcadores').upsert({
+    sofascore_id,
+    equipo_local: equipo_local || '',
+    equipo_visitante: equipo_visitante || '',
+    liga: liga || '',
+    apifootball_id: apifootball_id || null,
+    sportmonks_id: sportmonks_id || null,
+    activo: true,
+    gol_local: 0,
+    gol_visitante: 0,
+    estado: 'PRONTO',
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'sofascore_id' })
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  return NextResponse.json({ ok: true, sofascore_id })
 }

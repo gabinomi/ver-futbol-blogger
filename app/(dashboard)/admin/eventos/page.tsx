@@ -25,7 +25,6 @@ interface FormData {
   escudoVisitante: string
   golLocal: string
   golVisitante: string
-  sofascoreId: string
   isDraft: boolean
 }
 
@@ -79,7 +78,6 @@ export default function EventosPage() {
   const [selected, setSelected] = useState<Evento | null>(null)
   const [form, setForm] = useState<FormData | null>(null)
   const [saving, setSaving] = useState(false)
-  const [fetchingScore, setFetchingScore] = useState(false)
   const [msg, setMsg] = useState('')
   const [authed, setAuthed] = useState(false)
   const [tab, setTab] = useState<'nuevos' | 'publicados'>('nuevos')
@@ -140,7 +138,6 @@ export default function EventosPage() {
       escudoVisitante: '',
       golLocal: '0',
       golVisitante: '0',
-      sofascoreId: '',
       isDraft: false,
     })
     setMsg('')
@@ -148,28 +145,6 @@ export default function EventosPage() {
 
   function upd(key: keyof FormData, val: string | boolean) {
     setForm(prev => prev ? { ...prev, [key]: val } : null)
-  }
-
-  async function fetchScore() {
-    if (!form?.sofascoreId) return
-    setFetchingScore(true)
-    setMsg('')
-    try {
-      const res = await fetch(`/api/score?id=${form.sofascoreId}`)
-      const data: ScoreData = await res.json()
-      if ((data as any).error) {
-        setMsg('Error SofaScore: ' + (data as any).error)
-      } else {
-        upd('golLocal', String(data.homeScore))
-        upd('golVisitante', String(data.awayScore))
-        // Actualizar estado según SofaScore
-        if (data.status === 'finished') upd('estado', 'FINALIZADO')
-        else if (data.status === 'inprogress') upd('estado', 'EN-VIVO')
-        else if (data.status === 'notstarted') upd('estado', 'PRONTO')
-        setMsg(`✅ Marcador: ${data.homeScore} - ${data.awayScore} (${data.statusDescription || data.status})`)
-      }
-    } catch { setMsg('Error al consultar SofaScore') }
-    setFetchingScore(false)
   }
 
   async function actualizarMarcadorPost(postId: string, sofaId: string, titulo: string) {
@@ -341,30 +316,9 @@ export default function EventosPage() {
                         IDs para actualización automática — todos opcionales. Pegá la URL y copiá solo el número.
                       </p>
 
-                      <div className="flex gap-2">
-                        <div className="flex-1">
-                          <label className={lbl}>SofaScore ID</label>
-                          <input className={inp} value={form.sofascoreId} onChange={e => upd('sofascoreId', e.target.value)}
-                            placeholder="ej: 15239012  (sofascore.com/...#id:15239012)" />
-                        </div>
-                        <button onClick={fetchScore} disabled={!form.sofascoreId || fetchingScore}
-                          className="mt-5 px-3 py-2 bg-green-700 hover:bg-green-600 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg text-xs font-bold whitespace-nowrap">
-                          {fetchingScore ? '...' : '⚡ Test'}
-                        </button>
-                      </div>
 
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        <div>
-                          <label className={lbl}>API-Football ID <span className="text-gray-600 normal-case font-normal">opcional</span></label>
-                          <input className={inp} value={form.apifootballId || ''} onChange={e => upd('apifootballId', e.target.value)}
-                            placeholder="ej: 867421" />
-                        </div>
-                        <div>
-                          <label className={lbl}>SportMonks ID <span className="text-gray-600 normal-case font-normal">opcional</span></label>
-                          <input className={inp} value={form.sportmonksId || ''} onChange={e => upd('sportmonksId', e.target.value)}
-                            placeholder="ej: 19234567" />
-                        </div>
-                      </div>
+
+
                     </div>
                   </div>
 

@@ -1,6 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const BLOG_ID = '4582138764960172464'
+const APIFOOTBALL_KEY = process.env.APIFOOTBALL_KEY || '1b47a3e3aca7950a2acb160ea7f21482'
+
+// Buscar fixture en API-Football por equipos y fecha
+async function buscarFixtureId(equipoLocal: string, equipoVisitante: string): Promise<string | null> {
+  try {
+    const hoy = new Date().toISOString().split('T')[0]
+    const url = `https://v3.football.api-sports.io/fixtures?date=${hoy}&search=${encodeURIComponent(equipoLocal)}`
+    const res = await fetch(url, { headers: { 'x-apisports-key': APIFOOTBALL_KEY } })
+    if (!res.ok) return null
+    const data = await res.json()
+    const fixtures = data.response || []
+    // Buscar partido que coincida con ambos equipos
+    const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, '')
+    const nL = norm(equipoLocal)
+    const nV = norm(equipoVisitante)
+    for (const f of fixtures) {
+      const nH = norm(f.teams?.home?.name || '')
+      const nA = norm(f.teams?.away?.name || '')
+      if ((nH.includes(nL.substring(0,5)) || nL.includes(nH.substring(0,5))) &&
+          (nA.includes(nV.substring(0,5)) || nV.includes(nA.substring(0,5)))) {
+        return String(f.fixture?.id)
+      }
+    }
+    return null
+  } catch { return null }
+}
 
 async function getToken(req: NextRequest): Promise<string | null> {
   return req.cookies.get('blogger_access_token')?.value || null
@@ -19,7 +45,7 @@ function buildPostContent(data: any): string {
   data-gol-local="${golLocal ?? 0}"
   data-gol-visitante="${golVisitante ?? 0}"
   data-img-video="${imgVideo || 'https://i.imgur.com/1CeQ09b.png'}"
-  data-link-video="${link1 || ''}"
+  data-link-video="https://www.profitablecpmratenetwork.com/cfj1qzr6f?key=1fba4a9d0f97087a4bf44f8c4dde2ba3"
   data-link1="${link1 || ''}"
   data-link2="${link2 || ''}"
   data-link3="${link3 || ''}"
@@ -75,7 +101,7 @@ export async function POST(req: NextRequest) {
   })
   const data = await res.json()
 
-  // Si tiene sofascoreId, registrarlo en Supabase para tracking automático
+  // Si tiene sofascoreId, registrar en Supabase para tracking automático
   if (res.ok && body.sofascoreId) {
     try {
       const { createClient } = await import('@supabase/supabase-js')
@@ -83,12 +109,20 @@ export async function POST(req: NextRequest) {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
+
+      // Buscar apifootball_id automáticamente si no lo tienen
+      let apifootballId = body.apifootballId || null
+      if (!apifootballId && body.equipoLocal && body.equipoVisitante) {
+        apifootballId = await buscarFixtureId(body.equipoLocal, body.equipoVisitante)
+        if (apifootballId) console.log(`API-Football fixture encontrado: ${apifootballId}`)
+      }
+
       await sb.from('marcadores').upsert({
         sofascore_id: body.sofascoreId,
         equipo_local: body.equipoLocal || '',
         equipo_visitante: body.equipoVisitante || '',
         liga: body.liga || '',
-        apifootball_id: body.apifootballId || null,
+        apifootball_id: apifootballId,
         sportmonks_id: body.sportmonksId || null,
         gol_local: parseInt(body.golLocal) || 0,
         gol_visitante: parseInt(body.golVisitante) || 0,
@@ -96,6 +130,10 @@ export async function POST(req: NextRequest) {
         activo: body.estado !== 'FINALIZADO',
         updated_at: new Date().toISOString(),
       }, { onConflict: 'sofascore_id' })
+
+      // Devolver también el apifootball_id encontrado en la respuesta
+      const responseData = { ...data, apifootball_id_found: apifootballId }
+      return NextResponse.json(responseData, { status: 200 })
     } catch (e) {
       console.error('Supabase register error:', e)
     }

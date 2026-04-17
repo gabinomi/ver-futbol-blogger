@@ -36,14 +36,6 @@ interface BlogPost {
   published: string
 }
 
-interface ScoreData {
-  homeScore: number
-  awayScore: number
-  status: string
-  statusDescription: string
-  minute: number | null
-  period: number | null
-}
 
 const DEFAULT_IMG = 'https://i.imgur.com/1CeQ09b.png'
 const BASE_URL = 'https://ver-futbol-blogger.vercel.app'
@@ -147,33 +139,6 @@ export default function EventosPage() {
     setForm(prev => prev ? { ...prev, [key]: val } : null)
   }
 
-  async function actualizarMarcadorPost(postId: string, sofaId: string, titulo: string) {
-    if (!sofaId) { setMsg('Este post no tiene ID de SofaScore'); return }
-    setFetchingScore(true)
-    try {
-      const res = await fetch(`/api/score?id=${sofaId}`)
-      const data: ScoreData = await res.json()
-      if ((data as any).error) { setMsg('Error: ' + (data as any).error); return }
-
-      const estado = data.status === 'finished' ? 'FINALIZADO' : data.status === 'inprogress' ? 'EN-VIVO' : 'PRONTO'
-      // Extraer datos del post actual y parchear con nuevo marcador
-      const patchRes = await fetch('/api/blogger', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          postId,
-          updateScoreOnly: true,
-          golLocal: data.homeScore,
-          golVisitante: data.awayScore,
-          estado,
-        }),
-      })
-      const patchData = await patchRes.json()
-      if (patchData.error) setMsg('Error actualizando: ' + patchData.error)
-      else setMsg(`✅ ${titulo}: ${data.homeScore}-${data.awayScore} actualizado`)
-    } catch { setMsg('Error de red') }
-    setFetchingScore(false)
-  }
 
   async function publicar() {
     if (!form) return

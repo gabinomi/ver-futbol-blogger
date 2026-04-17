@@ -103,11 +103,9 @@ export default function EventosPage() {
         if (!grupos[key]) grupos[key] = { ...e, links: [e.link] }
         else grupos[key].links!.push(e.link)
       })
-      const futbol = Object.values(grupos).filter((e) => {
-        const cat = e.category || ''
-        return cat === 'Fútbol' || cat === 'Fútbol_cup' || cat === 'Futbol'
-      })
-      setEventos(futbol)
+      // Mostrar todos los eventos sin filtrar por categoría
+      const todos = Object.values(grupos)
+      setEventos(todos)
     } catch { setMsg('Error cargando eventos') }
     setLoadingEventos(false)
   }

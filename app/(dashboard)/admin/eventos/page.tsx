@@ -73,6 +73,9 @@ export default function EventosPage() {
   const [msg, setMsg] = useState('')
   const [authed, setAuthed] = useState(false)
   const [tab, setTab] = useState<'nuevos' | 'publicados'>('nuevos')
+  const [imgQuery, setImgQuery] = useState('')
+  const [imgResults, setImgResults] = useState<string[]>([])
+  const [searchingImg, setSearchingImg] = useState(false)
 
   useEffect(() => { checkAuth(); loadEventos() }, [])
   useEffect(() => { if (tab === 'publicados') loadPosts() }, [tab])
@@ -139,6 +142,19 @@ export default function EventosPage() {
     setForm(prev => prev ? { ...prev, [key]: val } : null)
   }
 
+
+  async function buscarImagenes(query: string) {
+    if (!query.trim()) return
+    setSearchingImg(true)
+    setImgResults([])
+    try {
+      const res = await fetch(`/api/images?q=${encodeURIComponent(query)}`)
+      const data = await res.json()
+      setImgResults(data.images || [])
+      if (!data.images?.length) setMsg('No se encontraron imágenes para esa búsqueda')
+    } catch { setMsg('Error buscando imágenes') }
+    setSearchingImg(false)
+  }
 
   async function publicar() {
     if (!form) return
@@ -287,9 +303,58 @@ export default function EventosPage() {
                     </div>
                   </div>
 
-                  <div><label className={lbl}>Imagen del partido</label>
-                    <input className={inp} value={form.imgVideo} onChange={e => upd('imgVideo', e.target.value)} />
-                    {form.imgVideo && <img src={form.imgVideo} className="mt-1 rounded h-16 w-full object-cover" onError={e => (e.currentTarget.style.display='none')} />}
+                  {/* IMAGEN + BUSCADOR */}
+                  <div className="bg-gray-800 rounded-lg p-3 space-y-3">
+                    <div className="text-xs font-bold uppercase text-gray-400">Imagen del partido</div>
+
+                    <div>
+                      <label className={lbl}>URL de imagen</label>
+                      <input className={inp} value={form.imgVideo} onChange={e => upd('imgVideo', e.target.value)}
+                        placeholder="https://..." />
+                      {form.imgVideo && (
+                        <img src={form.imgVideo} className="mt-2 rounded-lg h-24 w-full object-cover"
+                          onError={e => (e.currentTarget.style.display='none')} />
+                      )}
+                    </div>
+
+                    <div className="border-t border-gray-700 pt-3">
+                      <label className={lbl}>Buscar imágenes</label>
+                      <div className="flex gap-2">
+                        <input
+                          className={inp}
+                          value={imgQuery}
+                          onChange={e => setImgQuery(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && buscarImagenes(imgQuery)}
+                          placeholder={`${form.equipoLocal} vs ${form.equipoVisitante}`}
+                        />
+                        <button
+                          onClick={() => buscarImagenes(imgQuery || `${form.equipoLocal} vs ${form.equipoVisitante}`)}
+                          disabled={searchingImg}
+                          className="px-3 py-2 bg-blue-700 hover:bg-blue-600 disabled:bg-gray-700 rounded-lg text-xs font-bold whitespace-nowrap flex-shrink-0"
+                        >
+                          {searchingImg ? '...' : '🔍'}
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">Buscá en Ole, Infobae, TyC, ESPN, Clarín. Click en una imagen para usarla.</p>
+
+                      {imgResults.length > 0 && (
+                        <div className="grid grid-cols-3 gap-2 mt-2 max-h-56 overflow-y-auto pr-1">
+                          {imgResults.map((url, i) => (
+                            <div
+                              key={i}
+                              onClick={() => { upd('imgVideo', url); setImgResults([]) }}
+                              className={`cursor-pointer rounded-lg overflow-hidden border-2 transition-all hover:border-blue-500 ${form.imgVideo === url ? 'border-blue-500' : 'border-transparent'}`}
+                            >
+                              <img
+                                src={url}
+                                className="w-full h-16 object-cover"
+                                onError={e => (e.currentTarget.parentElement!.style.display='none')}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div><label className={lbl}>Stream 1 (principal)</label><input className={inp} value={form.link1} onChange={e => upd('link1', e.target.value)} /></div>

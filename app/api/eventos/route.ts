@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server'
 
 async function fetchStreamTP() {
   try {
-    const res = await fetch('https://streamtpnew.com/eventos.json', {
+    const res = await fetch('https://streamtp-x-y-z.ws/eventos.json', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://streamtpnew.com/',
+        'Referer': 'https://streamtp-x-y-z.ws/',
         'Accept': 'application/json',
       },
       cache: 'no-store',
@@ -79,11 +79,13 @@ export async function GET() {
 
     // 2. Añadir links de x550 sin duplicar canales para un mismo partido
     if (Array.isArray(x550Events)) {
+      const todayArg = new Date().toLocaleString("sv-SE", {timeZone: "America/Argentina/Buenos_Aires"}).split(" ")[0]
+      
       x550Events.forEach((xEv: any) => {
         const teams = getMatchTeams(xEv.title)
         const streamId = getStreamId(xEv.link)
         
-        // Buscar si este partido (equipos) ya existe en streamtpnew
+        // Buscar si este partido (equipos) ya existe en streamtp
         const tpMatches = merged.filter((m: any) => getMatchTeams(m.title) === teams)
         
         if (tpMatches.length > 0) {
@@ -91,12 +93,18 @@ export async function GET() {
           const hasLink = tpMatches.some((m: any) => getStreamId(m.link) === streamId)
           
           if (!hasLink) {
-            // Añadimos la opción de video usando el título original de streamtpnew para evitar crear un evento duplicado en el calendario
+            // Añadimos la opción de video usando el título original de streamtp para evitar crear un evento duplicado en el calendario
             const baseEvent = tpMatches[0]
             merged.push({
               ...baseEvent,
               link: xEv.link
             })
+          }
+        } else {
+          // El partido no existe en streamtp.
+          // Solo lo agregamos si la fecha coincide con la de hoy (o no tiene fecha) para evitar eventos fantasma de días anteriores/siguientes.
+          if (!xEv.date || xEv.date === todayArg) {
+            merged.push(xEv)
           }
         }
       })

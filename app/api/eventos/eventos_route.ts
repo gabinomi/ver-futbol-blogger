@@ -79,7 +79,6 @@ export async function GET() {
 
     // 2. Añadir links de x550 sin duplicar canales para un mismo partido
     if (Array.isArray(x550Events)) {
-      const todayArg = new Date().toLocaleString("sv-SE", {timeZone: "America/Argentina/Buenos_Aires"}).split(" ")[0]
       
       x550Events.forEach((xEv: any) => {
         const teams = getMatchTeams(xEv.title)
@@ -99,12 +98,6 @@ export async function GET() {
               ...baseEvent,
               link: xEv.link
             })
-          }
-        } else {
-          // El partido no existe en streamtp.
-          // Solo lo agregamos si la fecha coincide con la de hoy (o no tiene fecha) para evitar eventos fantasma de días anteriores/siguientes.
-          if (!xEv.date || xEv.date === todayArg) {
-            merged.push(xEv)
           }
         }
       })

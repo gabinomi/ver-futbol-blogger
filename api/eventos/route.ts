@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 async function fetchStreamTP() {
   try {
-    const res = await fetch('https://streamtp-x-y-z.ws/eventos.json', {
+    const res = await fetch('https://streamtpday1.xyz/wc.json?_=1781893698131', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Referer': 'https://streamtp-x-y-z.ws/',

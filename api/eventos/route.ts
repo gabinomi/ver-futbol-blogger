@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 async function fetchStreamTP() {
   try {
-    const res = await fetch('https://streamx996.one/json/agenda550.json?nocache=1782769335487', {
+    const res = await fetch('https://streamx741.com/json/agenda550.json?nocache=', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Referer': 'https://streamtp-x-y-z.ws/',

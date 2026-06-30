@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 async function fetchStreamTP() {
   try {
-    const res = await fetch('https://streamtp.sbs/eventos.json', {
+    const res = await fetch('https://streamtp.sbs/wc.json?_=1782851795160', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Referer': 'https://streamtp.sbs/',

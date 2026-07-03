@@ -20,7 +20,7 @@ async function fetchStreamTP() {
 
 async function fetchStreamX550() {
   try {
-    const res = await fetch('https://streamx741.com/json/agenda550.json?nocache=' + Date.now(), {
+    const res = await fetch('https://streamx996.one/json/agenda550.json' + Date.now(), {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
         'Accept': 'application/json',

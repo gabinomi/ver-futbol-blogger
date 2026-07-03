@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 async function fetchStreamTP() {
   try {
-    const res = await fetch('https://streamtp.sbs/wc.json', {
+    const res = await fetch('https://streamtp.sbs/wc.json?nocache=' + Date.now(), {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Referer': 'https://streamtp.sbs/',
@@ -12,7 +12,24 @@ async function fetchStreamTP() {
       signal: AbortSignal.timeout(6000)
     })
     if (!res.ok) return []
-    return await res.json()
+    const data = await res.json()
+    const flattened: any[] = []
+    if (data && data.events && Array.isArray(data.events)) {
+      data.events.forEach((ev: any) => {
+        if (ev.links && Array.isArray(ev.links)) {
+          ev.links.forEach((l: any) => {
+            flattened.push({
+              title: ev.title,
+              time: ev.time,
+              category: ev.category,
+              link: l.url,
+              status: l.status === 'live' ? 'en vivo' : 'próximo'
+            })
+          })
+        }
+      })
+    }
+    return flattened
   } catch (e) {
     return []
   }
@@ -20,7 +37,7 @@ async function fetchStreamTP() {
 
 async function fetchStreamX550() {
   try {
-    const res = await fetch('https://streamx996.one/json/agenda550.json' + Date.now(), {
+    const res = await fetch('https://streamx996.one/json/agenda550.json?nocache=' + Date.now(), {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
         'Accept': 'application/json',
@@ -30,7 +47,12 @@ async function fetchStreamX550() {
     })
     if (!res.ok) return []
     const rawData = await res.json()
-    
+    if (Array.isArray(rawData)) {
+      return rawData.map(ev => ({
+        ...ev,
+        status: ev.status ? ev.status.toLowerCase() : 'próximo'
+      }))
+    }
     return rawData
   } catch (e) {
     return []
@@ -61,32 +83,31 @@ export async function GET() {
       fetchStreamX550()
     ])
 
-    let merged = streamTpEvents && streamTpEvents.length > 0 ? [...streamTpEvents] : []
+    // streamx996 es ahora el principal
+    let merged = x550Events && x550Events.length > 0 ? [...x550Events] : []
 
-    if (merged.length === 0 && x550Events && x550Events.length > 0) {
-      // Fallback: Si StreamTP falla, armamos la agenda exclusivamente con StreamX741
-      // Nos aseguramos de no repetir exactamente el mismo partido y el mismo enlace
-      const uniqueX550: any[] = []
+    if (merged.length === 0 && streamTpEvents && streamTpEvents.length > 0) {
+      // Fallback: Si streamx996 falla, armamos la agenda exclusivamente con streamtp
+      const uniqueTp: any[] = []
       const seen = new Set()
-      x550Events.forEach((ev: any) => {
+      streamTpEvents.forEach((ev: any) => {
         const teams = getMatchTeams(ev.title)
         const streamId = getStreamId(ev.link)
         const key = `${teams}-${streamId}`
         if (!seen.has(key)) {
           seen.add(key)
-          uniqueX550.push(ev)
+          uniqueTp.push(ev)
         }
       })
-      merged = uniqueX550
-    } else if (merged.length > 0 && x550Events && x550Events.length > 0) {
-      // 1. Enriquecer streamTpEvents con categorías de x550 (usando coincidencia de equipos)
-      // Pero evitamos añadir enlaces extra para NO duplicar opciones de video en el frontend
+      merged = uniqueTp
+    } else if (merged.length > 0 && streamTpEvents && streamTpEvents.length > 0) {
+      // 1. Enriquecer streamx996Events con categorías de streamtp si hace falta
       merged = merged.map((ev: any) => {
         const teams = getMatchTeams(ev.title)
-        const matchingX550 = x550Events.filter((x: any) => getMatchTeams(x.title) === teams)
+        const matchingTp = streamTpEvents.filter((x: any) => getMatchTeams(x.title) === teams)
         
-        if (matchingX550.length > 0) {
-          const cat = matchingX550.find((x: any) => x.category && x.category !== 'Other')?.category
+        if (matchingTp.length > 0) {
+          const cat = matchingTp.find((x: any) => x.category && x.category !== 'Other')?.category
           if (cat && (!ev.category || ev.category === 'Other')) {
             ev.category = cat
           }

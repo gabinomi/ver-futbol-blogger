@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 import { NextResponse } from 'next/server'
+import { enriquecerEventos } from '@/lib/match'
 
 function getStatusPorHorario(timeStr: string, statusFromJson?: string): string {
   if (!timeStr || !timeStr.includes(':')) {
@@ -130,7 +131,8 @@ const getMatchTeams = (title: string) => {
   return parts.length > 1 ? parts[1].toLowerCase().trim() : title.toLowerCase().trim()
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const debug = new URL(request.url).searchParams.get('debug') === '1'
   try {
     const [streamXEvents, streamTpEvents] = await Promise.all([
       fetchStreamX(),
@@ -182,7 +184,23 @@ export async function GET() {
       throw new Error('No se encontraron eventos en ninguna fuente.')
     }
 
-    return NextResponse.json(merged, {
+    // Enriquecimiento con ESPN (escudos, colores, logo de liga, marcador). Nunca rompe la agenda:
+    // si ESPN falla, se devuelven los eventos tal cual.
+    const { events: enriched, informe } = await enriquecerEventos(merged, debug)
+
+    // /api/eventos?debug=1 → además del listado, muestra qué eventos se emparejaron y cuáles no
+    if (debug) {
+      const resumen = {
+        total: informe.length,
+        ok: informe.filter(i => i.estado === 'ok').length,
+        fallidos: informe.filter(i => i.estado !== 'ok').length,
+      }
+      return NextResponse.json({ resumen, informe, eventos: enriched }, {
+        headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' },
+      })
+    }
+
+    return NextResponse.json(enriched, {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'no-store, no-cache, must-revalidate',

@@ -140,7 +140,12 @@ const LIGAS: Array<[RegExp, Lg[]]> = [
   [/chile|primera division.*chi/, [S('chi.1')]],
   [/uruguay|primera division.*uru/, [S('uru.1')]],
   [/super lig/, [S('tur.1')]],
+  // Nombres genéricos que usan muchos países: se descargan varias ligas y se decide por equipos + hora
+  [/^(primera division|primera|segunda division|liga|liga nacional|division profesional)$/,
+    [S('uru.1'), S('chi.1'), S('par.1'), S('ecu.1'), S('per.1'), S('bol.1'), S('ven.1'), S('col.1'), S('arg.1')]],
 ]
+// Si la liga no se reconoce en absoluto, se prueba contra estas (Sudamérica) antes de rendirse
+export const RESPALDO: Lg[] = [S('uru.1'), S('chi.1'), S('par.1'), S('ecu.1'), S('per.1'), S('bol.1'), S('ven.1'), S('col.1')]
 export function slugsDeLiga(league: string): Lg[] {
   const l = strip(league)
   if (!l) return []
@@ -280,7 +285,10 @@ export async function enriquecerEventos(events: any[], debug = false): Promise<{
     const need = new Map<string, Lg>()
     uniq.forEach(u => {
       const t = parseTitulo(u.title)
-      if (t) slugsDeLiga(t.league).forEach(l => need.set(l.sport + '/' + l.slug, l))
+      if (t) {
+        const lg = slugsDeLiga(t.league)
+        ;(lg.length ? lg : RESPALDO).forEach(l => need.set(l.sport + '/' + l.slug, l))
+      }
     })
     const lista = Array.from(need.values()).slice(0, 15)
     const cargadas = await Promise.all(lista.map(l => cargarLiga(l, nowMs)))
@@ -294,14 +302,15 @@ export async function enriquecerEventos(events: any[], debug = false): Promise<{
       const t = parseTitulo(u.title)
       const item: InformeItem = { title: u.title, league: t ? t.league : '', slugs: [], estado: 'sin-titulo' }
       if (t) {
-        const lgs = slugsDeLiga(t.league)
+        const lgs0 = slugsDeLiga(t.league)
+        const lgs = lgs0.length ? lgs0 : RESPALDO
         item.slugs = lgs.map(l => l.slug)
         let pool: EspnEvent[] = []
         lgs.forEach(l => { pool = pool.concat(porClave.get(l.sport + '/' + l.slug) || []) })
         let r = mejorCandidato(u.title, u.time, pool, nowMs)
         // liga desconocida o sin coincidencia: probar contra todo lo descargado
         if (!r.best && todos.length) r = mejorCandidato(u.title, u.time, todos, nowMs)
-        item.estado = !lgs.length ? 'sin-liga' : (!pool.length && !todos.length ? 'sin-partidos-espn' : 'sin-match')
+        item.estado = !lgs0.length ? 'sin-liga' : (!pool.length && !todos.length ? 'sin-partidos-espn' : 'sin-match')
         if (r.top) item.mejor = { espn: r.top.ev.home.name + ' vs ' + r.top.ev.away.name, nameScore: +r.top.nameScore.toFixed(2), diffMin: Math.round(r.top.diffMin) }
         if (r.best) { resultado.set(k, armarEnriquecimiento(r.best)); item.estado = 'ok'; item.usado = r.best.ev.slug }
       }

@@ -3,7 +3,7 @@ import { Partido } from '@/types'
 import Link from 'next/link'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 
-export const revalidate = 0
+export const dynamic = 'force-dynamic'
 
 const estadoColor = {
   'EN-VIVO': 'bg-red-600/20 text-red-400 border-red-600/40',

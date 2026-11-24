@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: 'Ver fútbol EN VIVO gratis. Partidos de hoy con links de streaming, horarios por país y marcadores en tiempo real.',
 }
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
 async function getPartidos(): Promise<Partido[]> {
   const { data } = await supabase

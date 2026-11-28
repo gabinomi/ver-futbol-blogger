@@ -186,7 +186,7 @@ export async function GET(request: Request) {
 
     // Enriquecimiento con ESPN (escudos, colores, logo de liga, marcador). Nunca rompe la agenda:
     // si ESPN falla, se devuelven los eventos tal cual.
-    const { events: enriched, informe } = await enriquecerEventos(merged, debug)
+    const { events: enriched, informe, ligas } = await enriquecerEventos(merged, debug)
 
     // /api/eventos?debug=1 → además del listado, muestra qué eventos se emparejaron y cuáles no
     if (debug) {
@@ -195,7 +195,7 @@ export async function GET(request: Request) {
         ok: informe.filter(i => i.estado === 'ok').length,
         fallidos: informe.filter(i => i.estado !== 'ok').length,
       }
-      return NextResponse.json({ resumen, informe, eventos: enriched }, {
+      return NextResponse.json({ resumen, ligas, informe, eventos: enriched }, {
         headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' },
       })
     }

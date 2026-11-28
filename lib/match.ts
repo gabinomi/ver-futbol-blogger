@@ -35,6 +35,7 @@ const ALIAS: Record<string, string> = {
   'tottenham': 'tottenham hotspur', 'wolves': 'wolverhampton wanderers',
   'river': 'river plate', 'boca': 'boca juniors', 'velez': 'velez sarsfield',
   'atletico madrid': 'atletico madrid', 'atl madrid': 'atletico madrid', 'atleti': 'atletico madrid',
+  'estudiantes lp': 'estudiantes de la plata', 'gimnasia lp': 'gimnasia la plata', 'sj earthquakes': 'san jose earthquakes',
   'corea del sur': 'south korea', 'costa de marfil': 'ivory coast', 'paises bajos': 'netherlands',
 }
 
@@ -87,9 +88,11 @@ export function parseTitulo(title: string): { league: string; home: string; away
   const i = title.indexOf(':')
   const league = i !== -1 ? title.slice(0, i).trim() : ''
   const rest = i !== -1 ? title.slice(i + 1).trim() : title.trim()
-  const parts = rest.split(/\s+vs\.?\s+|\s+v\s+|\s+@\s+|\s+-\s+/i)
+  const parts = rest.split(/\s+vs\.?\s+|\s+v\s+|\s+@\s+/i)
   if (parts.length < 2) return null
-  return { league, home: parts[0].trim(), away: parts.slice(1).join(' - ').trim() }
+  // "Palmeiras vs Estudiantes LP - Final" → se descarta el sufijo " - Final"
+  const limpio = (x: string) => x.replace(/\s+-\s+.*$/, '').trim()
+  return { league, home: limpio(parts[0]), away: limpio(parts.slice(1).join(' ')) }
 }
 
 // ───────────────────────── Liga → códigos de ESPN ─────────────────────────
@@ -112,26 +115,34 @@ const LIGAS: Array<[RegExp, Lg[]]> = [
   [/eliminatorias|clasificacion|qualif/, [S('fifa.worldq.conmebol'), S('fifa.worldq.uefa'), S('fifa.worldq.concacaf'), S('fifa.worldq.afc'), S('fifa.worldq.caf')]],
   [/amistoso|friendly|fecha fifa/, [S('fifa.friendly'), S('fifa.friendly.w')]],
   [/mundial|copa del mundo|world cup/, [S('fifa.world')]],
-  [/champions/, [S('uefa.champions')]],
+  [/championship/, [S('eng.2')]],
+  [/\bchampions\b/, [S('uefa.champions')]],
   [/conference/, [S('uefa.europa.conf')]],
   [/europa/, [S('uefa.europa')]],
   [/copa argentina/, [S('arg.copa')]],
   [/primera nacional|nacional b/, [S('arg.2')]],
-  [/liga profesional|copa de la liga|trofeo de campeones|supercopa argentina/, [S('arg.1'), S('arg.copa')]],
+  [/copa de la liga|trofeo de campeones|supercopa argentina/, [S('arg.1'), S('arg.copa')]],
+  [/liga profesional/, [S('arg.1')]],
   [/laliga 2|la liga 2|hypermotion|segunda/, [S('esp.2')]],
   [/copa del rey/, [S('esp.copa_del_rey')]],
   [/laliga|la liga|primera division.*espana|supercopa de espana/, [S('esp.1')]],
   [/premier/, [S('eng.1')]],
-  [/championship/, [S('eng.2')]],
   [/fa cup/, [S('eng.fa')]],
   [/carabao|efl cup|league cup/, [S('eng.league_cup')]],
-  [/serie a|coppa italia/, [S('ita.1'), S('ita.coppa_italia')]],
-  [/bundesliga|dfb/, [S('ger.1'), S('ger.dfb_pokal')]],
+  [/coppa italia/, [S('ita.coppa_italia')]],
+  [/serie b/, [S('ita.2')]],
+  [/serie a/, [S('ita.1')]],
+  [/dfb/, [S('ger.dfb_pokal')]],
+  [/2\. ?bundesliga|bundesliga 2/, [S('ger.2')]],
+  [/bundesliga/, [S('ger.1')]],
   [/ligue 1|ligue1/, [S('fra.1')]],
   [/liga portugal|primeira liga/, [S('por.1')]],
   [/eredivisie/, [S('ned.1')]],
-  [/brasileirao|serie a brasil|copa do brasil/, [S('bra.1'), S('bra.copa_do_brazil')]],
-  [/betplay|liga colombiana|copa colombia/, [S('col.1'), S('col.copa')]],
+  [/copa do brasil/, [S('bra.copa_do_brazil')]],
+  [/brasileirao|serie a brasil/, [S('bra.1')]],
+  [/torneo betplay|primera b colombia/, [S('col.2')]],
+  [/copa colombia/, [S('col.copa')]],
+  [/betplay|liga colombiana/, [S('col.1')]],
   [/liga mx|liga mexicana/, [S('mex.1')]],
   [/\bmls\b/, [S('usa.1')]],
   [/liga 1|liga peruana/, [S('per.1')]],
@@ -144,6 +155,7 @@ const LIGAS: Array<[RegExp, Lg[]]> = [
   [/^(primera division|primera|segunda division|liga|liga nacional|division profesional)$/,
     [S('uru.1'), S('chi.1'), S('par.1'), S('ecu.1'), S('per.1'), S('bol.1'), S('ven.1'), S('col.1'), S('arg.1')]],
 ]
+export const NO_FUTBOL = /\bf1\b|formula|gran premio|grand prix|motogp|tenis|tennis|atp|wta|ufc|mma|nfl|mlb|nhl|boxeo|wwe|rugby|golf/
 // Si la liga no se reconoce en absoluto, se prueba contra estas (Sudamérica) antes de rendirse
 export const RESPALDO: Lg[] = [S('uru.1'), S('chi.1'), S('par.1'), S('ecu.1'), S('per.1'), S('bol.1'), S('ven.1'), S('col.1')]
 export function slugsDeLiga(league: string): Lg[] {
@@ -271,9 +283,11 @@ export async function cargarLiga(lg: Lg, nowMs: number): Promise<EspnEvent[]> {
 }
 
 // ───────────────────────── API pública del módulo ─────────────────────────
-export interface InformeItem { title: string; league: string; slugs: string[]; estado: 'ok' | 'sin-liga' | 'sin-titulo' | 'sin-partidos-espn' | 'sin-match'; mejor?: { espn: string; nameScore: number; diffMin: number }; usado?: string }
+export interface InformeItem { title: string; league: string; slugs: string[]; estado: 'ok' | 'sin-liga' | 'sin-titulo' | 'no-futbol' | 'liga-sin-partidos' | 'sin-match'; mejor?: { espn: string; nameScore: number; diffMin: number }; usado?: string }
+export interface LigaInfo { slug: string; partidos: number }
+const MAX_LIGAS = 45
 
-export async function enriquecerEventos(events: any[], debug = false): Promise<{ events: any[]; informe: InformeItem[] }> {
+export async function enriquecerEventos(events: any[], debug = false): Promise<{ events: any[]; informe: InformeItem[]; ligas: LigaInfo[] }> {
   const informe: InformeItem[] = []
   try {
     const nowMs = Date.now()
@@ -281,49 +295,57 @@ export async function enriquecerEventos(events: any[], debug = false): Promise<{
     const uniq = new Map<string, { title: string; time: string }>()
     events.forEach(e => { if (e && e.title) uniq.set(e.title + '|' + e.time, { title: e.title, time: e.time }) })
 
-    // 2) ligas necesarias (máx. 15 para no abusar de ESPN)
+    // 2) ligas necesarias. Primero las que se reconocen por nombre; después las de respaldo (liga genérica o desconocida).
     const need = new Map<string, Lg>()
+    const respaldo: Lg[] = []
     uniq.forEach(u => {
       const t = parseTitulo(u.title)
-      if (t) {
-        const lg = slugsDeLiga(t.league)
-        ;(lg.length ? lg : RESPALDO).forEach(l => need.set(l.sport + '/' + l.slug, l))
-      }
+      if (!t || NO_FUTBOL.test(strip(t.league))) return
+      const lg = slugsDeLiga(t.league)
+      if (lg.length) lg.forEach(l => need.set(l.sport + '/' + l.slug, l)); else RESPALDO.forEach(l => respaldo.push(l))
     })
-    const lista = Array.from(need.values()).slice(0, 15)
+    respaldo.forEach(l => { if (!need.has(l.sport + '/' + l.slug)) need.set(l.sport + '/' + l.slug, l) })
+    const lista = Array.from(need.values()).slice(0, MAX_LIGAS)
     const cargadas = await Promise.all(lista.map(l => cargarLiga(l, nowMs)))
     const porClave = new Map<string, EspnEvent[]>()
     lista.forEach((l, i) => porClave.set(l.sport + '/' + l.slug, cargadas[i]))
     const todos: EspnEvent[] = ([] as EspnEvent[]).concat(...cargadas)
+    const ligas: LigaInfo[] = lista.map((l, i) => ({ slug: l.slug, partidos: cargadas[i].length }))
 
     // 3) emparejar
     const resultado = new Map<string, Enriquecimiento>()
     uniq.forEach((u, k) => {
       const t = parseTitulo(u.title)
       const item: InformeItem = { title: u.title, league: t ? t.league : '', slugs: [], estado: 'sin-titulo' }
-      if (t) {
+      if (t && NO_FUTBOL.test(strip(t.league))) item.estado = 'no-futbol'
+      else if (t) {
         const lgs0 = slugsDeLiga(t.league)
         const lgs = lgs0.length ? lgs0 : RESPALDO
         item.slugs = lgs.map(l => l.slug)
         let pool: EspnEvent[] = []
         lgs.forEach(l => { pool = pool.concat(porClave.get(l.sport + '/' + l.slug) || []) })
         let r = mejorCandidato(u.title, u.time, pool, nowMs)
-        // liga desconocida o sin coincidencia: probar contra todo lo descargado
+        // sin coincidencia en su liga: probar contra todo lo descargado
         if (!r.best && todos.length) r = mejorCandidato(u.title, u.time, todos, nowMs)
-        item.estado = !lgs0.length ? 'sin-liga' : (!pool.length && !todos.length ? 'sin-partidos-espn' : 'sin-match')
+        item.estado = !lgs0.length ? 'sin-liga' : (!pool.length ? 'liga-sin-partidos' : 'sin-match')
         if (r.top) item.mejor = { espn: r.top.ev.home.name + ' vs ' + r.top.ev.away.name, nameScore: +r.top.nameScore.toFixed(2), diffMin: Math.round(r.top.diffMin) }
         if (r.best) { resultado.set(k, armarEnriquecimiento(r.best)); item.estado = 'ok'; item.usado = r.best.ev.slug }
       }
       informe.push(item)
     })
 
-    // 4) adjuntar sin quitar ningún campo existente
+    // 4) adjuntar sin quitar ningún campo existente. El campo "espn" va solo en la primera fila de cada partido
+    //    (la plantilla lo toma de cualquiera de las filas del grupo): así el JSON pesa mucho menos.
+    const yaPuesto = new Set<string>()
     const out = events.map(e => {
-      const en = e && resultado.get(e.title + '|' + e.time)
-      return en ? { ...e, espn: en } : e
+      const k = e && e.title + '|' + e.time
+      const en = e && resultado.get(k)
+      if (!en || yaPuesto.has(k)) return e
+      yaPuesto.add(k)
+      return { ...e, espn: en }
     })
-    return { events: out, informe: debug ? informe : [] }
+    return { events: out, informe: debug ? informe : [], ligas: debug ? ligas : [] }
   } catch {
-    return { events, informe: [] }
+    return { events, informe: [], ligas: [] }
   }
 }
